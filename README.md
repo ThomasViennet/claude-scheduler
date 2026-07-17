@@ -1,131 +1,131 @@
 # claude-scheduler
 
-Automatically sends scheduled messages to Claude at configurable times to anchor the 5-hour usage windows.
+**English** · [Version française](README.fr.md)
 
-Envoie automatiquement un message minimal à Claude à heures fixes pour **ancrer les fenêtres de quota de 5 h** de l'abonnement Claude Pro/Max à des horaires prévisibles.
+Automatically sends a minimal message to Claude at fixed times to **anchor the 5-hour usage windows** of a Claude Pro/Max subscription to predictable hours.
 
-## But
+## Why
 
-Les abonnements Claude fonctionnent par fenêtres de quota de 5 h qui **démarrent au premier message envoyé**. Si votre première interaction de la journée a lieu à une heure aléatoire, les resets de quota tombent à des heures aléatoires. En envoyant un « hi » automatique à heures fixes (par défaut 07:00, 12:00 et 17:00), les fenêtres s'enchaînent de façon prévisible : 07:00–12:00, 12:00–17:00, 17:00–22:00.
+Claude subscriptions work with 5-hour quota windows that **start when you send your first message**. If your first interaction of the day happens at a random time, your quota resets happen at random times. By sending an automatic "hi" at fixed times (07:00, 12:00 and 17:00 by default), the windows chain predictably: 07:00–12:00, 12:00–17:00, 17:00–22:00.
 
-## Comment ça marche
+## How it works
 
-Le CLI officiel **Claude Code**, connecté avec votre abonnement (et non une clé API), consomme le **même quota** que claude.ai. Un simple :
+The official **Claude Code** CLI, authenticated with your subscription (not an API key), consumes the **same quota** as claude.ai. A simple:
 
 ```bash
 claude -p "hi" --model haiku
 ```
 
-ouvre donc une fenêtre de 5 h exactement comme un message sur le site web — pour un coût de quota négligeable (Haiku + message d'un mot). Ce dépôt fournit deux scripts bash autour de cette commande :
+therefore opens a 5-hour window exactly like a message on the website would — at a negligible quota cost (Haiku + a one-word message). This repo provides two bash scripts around that command:
 
-- **`ping.sh`** — envoie le message, journalise le résultat, gère verrou anti-concurrence, timeout, une nouvelle tentative en cas d'erreur transitoire, et rotation du log.
-- **`apply-schedule.sh`** — lit les horaires dans `scheduler.conf` et installe les lignes cron correspondantes (bloc idempotent : ré-exécuter le script met à jour le bloc sans toucher au reste du crontab).
+- **`ping.sh`** — sends the message, logs the result, handles a concurrency lock, a timeout, a single retry on transient errors, and log rotation.
+- **`apply-schedule.sh`** — reads the times from `scheduler.conf` and installs the matching cron lines (idempotent block: re-running the script updates the block without touching the rest of your crontab).
 
-Aucune dépendance en dehors de bash, cron et du CLI claude.
+No dependencies beyond bash, cron and the claude CLI.
 
-## Prérequis
+## Requirements
 
-- Une machine allumée aux heures de ping : serveur, VPS, Raspberry Pi… (Linux ; testable aussi sur macOS).
-- Un abonnement Claude Pro ou Max.
-- `bash` et `cron` (présents par défaut sur Linux).
+- A machine that is powered on at ping times: server, VPS, Raspberry Pi… (Linux; also testable on macOS).
+- A Claude Pro or Max subscription.
+- `bash` and `cron` (present by default on Linux).
 
-## Installation (Raspberry Pi / serveur Linux)
+## Installation (Raspberry Pi / Linux server)
 
-1. **Fuseau horaire** — les heures de `scheduler.conf` sont en heure locale de la machine (les VPS sont souvent en UTC) :
+1. **Timezone** — the times in `scheduler.conf` are the machine's local time (VPS are often set to UTC):
 
    ```bash
    sudo timedatectl set-timezone Europe/Paris
-   date   # vérifier
+   date   # check
    ```
 
-2. **Installer le CLI Claude Code** :
+2. **Install the Claude Code CLI**:
 
    ```bash
    curl -fsSL https://claude.ai/install.sh | bash
    ```
 
-   Le binaire est installé dans `~/.local/bin/claude`. Solution de repli si l'installeur ne supporte pas votre architecture : `sudo apt install nodejs npm && npm install -g @anthropic-ai/claude-code` (puis adapter `CLAUDE_BIN` dans `scheduler.conf`).
+   The binary lands in `~/.local/bin/claude`. Fallback if the installer does not support your architecture: `sudo apt install nodejs npm && npm install -g @anthropic-ai/claude-code` (then adjust `CLAUDE_BIN` in `scheduler.conf`).
 
-3. **Se connecter avec l'abonnement** (fonctionne en SSH, sans écran) :
+3. **Log in with your subscription** (works over SSH, no display needed):
 
    ```bash
    claude setup-token
    ```
 
-   Le CLI affiche une URL OAuth : ouvrez-la dans le navigateur d'un autre appareil (Mac, téléphone), connectez-vous avec votre compte claude.ai, puis collez le code retourné dans le terminal SSH. Le token longue durée est stocké dans `~/.claude/.credentials.json`.
+   The CLI prints an OAuth URL: open it in a browser on another device (laptop, phone), log in with your claude.ai account, then paste the returned code into the SSH terminal. The long-lived token is stored in `~/.claude/.credentials.json`.
 
-   > Note : copier `~/.claude/.credentials.json` depuis une autre machine **Linux** fonctionne aussi — mais uniquement par `scp` direct entre les deux machines (jamais via un cloud, un mail ou un chat), suivi d'un `chmod 600` sur la copie. Ça ne marche pas depuis macOS (identifiants dans le Trousseau, pas dans un fichier). La méthode propre reste `claude setup-token` sur chaque machine.
+   > Note: copying `~/.claude/.credentials.json` from another **Linux** machine also works — but only via direct `scp` between the two machines (never through a cloud drive, email or chat), followed by `chmod 600` on the copy. It does not work from macOS (credentials live in the Keychain, not in a file). The clean method remains `claude setup-token` on each machine.
 
-4. **Cloner, configurer, tester** :
+4. **Clone, configure, test**:
 
    ```bash
-   git clone <url-du-depot> && cd claude-scheduler
-   nano scheduler.conf        # ajuster PING_TIMES si besoin
-   ./ping.sh --dry-run        # vérifie la commande sans appeler Claude
-   ./ping.sh                  # test réel : attendre [OK] dans logs/ping.log
+   git clone https://github.com/ThomasViennet/claude-scheduler.git && cd claude-scheduler
+   nano scheduler.conf        # adjust PING_TIMES if needed
+   ./ping.sh --dry-run        # checks the command without calling Claude
+   ./ping.sh                  # real test: expect [OK] in logs/ping.log
    tail logs/ping.log
    ```
 
-5. **Installer le planning** :
+5. **Install the schedule**:
 
    ```bash
    ./apply-schedule.sh
-   crontab -l                 # vérifier le bloc claude-scheduler
-   systemctl status cron      # vérifier que le démon cron tourne
+   crontab -l                 # check the claude-scheduler block
+   systemctl status cron      # check the cron daemon is running
    ```
 
 ## Configuration (`scheduler.conf`)
 
-| Clé | Défaut | Rôle |
+| Key | Default | Purpose |
 |---|---|---|
-| `PING_TIMES` | `07:00 12:00 17:00` | Heures d'envoi (heure locale machine, format HH:MM, séparées par des espaces). À espacer idéalement de ≥ 5 h. |
-| `MODEL` | `haiku` | Modèle utilisé (le moins coûteux en quota). |
-| `PROMPT` | `hi` | Message envoyé. |
-| `PING_TIMEOUT` | `120` | Délai max d'un appel en secondes (si `timeout` est disponible). |
-| `RETRY_DELAY` | `30` | Attente avant l'unique nouvelle tentative. |
-| `CLAUDE_BIN` | `~/.local/bin/claude` | Chemin du binaire claude. |
-| `LOG_FILE` | *(vide)* | Fichier de log ; vide = `logs/ping.log` dans le dépôt. Si vous le placez ailleurs dans le dépôt, gardez l'extension `.log` (couverte par le `.gitignore`) pour ne jamais committer vos logs. |
-| `MAX_LOG_LINES` | `2000` | Au-delà, le log est tronqué aux 1000 dernières lignes. |
+| `PING_TIMES` | `07:00 12:00 17:00` | Ping times (machine local time, HH:MM format, space-separated). Ideally spaced ≥ 5h apart. |
+| `MODEL` | `haiku` | Model used (the cheapest in quota terms). |
+| `PROMPT` | `hi` | Message sent. |
+| `PING_TIMEOUT` | `120` | Max duration of one call in seconds (if `timeout` is available). |
+| `RETRY_DELAY` | `30` | Wait before the single retry. |
+| `CLAUDE_BIN` | `~/.local/bin/claude` | Path to the claude binary. |
+| `LOG_FILE` | *(empty)* | Log file; empty = `logs/ping.log` in the repo. If you place it elsewhere in the repo, keep the `.log` extension (covered by `.gitignore`) so your logs are never committed. |
+| `MAX_LOG_LINES` | `2000` | Above this, the log is truncated to the last half. |
 
-Après modification de `PING_TIMES`, relancer `./apply-schedule.sh` pour régénérer le crontab.
+After changing `PING_TIMES`, re-run `./apply-schedule.sh` to regenerate the crontab.
 
-## Utilisation
+## Usage
 
 ```bash
-./ping.sh                    # envoie un ping maintenant
-./ping.sh --dry-run          # journalise la commande sans l'exécuter
-./apply-schedule.sh          # installe / met à jour le bloc cron
-./apply-schedule.sh --remove # retire proprement le bloc cron
-tail -f logs/ping.log        # suivre les exécutions
+./ping.sh                    # send a ping now
+./ping.sh --dry-run          # log the command without executing it
+./apply-schedule.sh          # install / update the cron block
+./apply-schedule.sh --remove # cleanly remove the cron block
+tail -f logs/ping.log        # follow the runs
 ```
 
-Format du log — une ligne par événement :
+Log format — one line per event:
 
 ```
 2026-07-15T07:00:04+0200 [OK] model=haiku duration=5s response="Hi! How can I help you today?"
-2026-07-15T12:00:02+0200 [RETRY] exit=1 nouvelle tentative dans 30s
+2026-07-15T12:00:02+0200 [RETRY] exit=1 retrying in 30s
 2026-07-15T12:00:35+0200 [ERROR] exit=1 output="fetch failed ..."
 ```
 
-Statuts possibles : `OK`, `DRY-RUN`, `QUOTA` (limite déjà atteinte — sans gravité, une fenêtre est déjà ouverte), `AUTH` (token expiré → relancer `claude setup-token`), `RETRY`/`ERROR` (erreur transitoire ou persistante), `SKIP` (exécution concurrente ignorée).
+Possible statuses: `OK`, `DRY-RUN`, `QUOTA` (limit already reached — harmless, a window is already open), `AUTH` (expired token → re-run `claude setup-token`), `RETRY`/`ERROR` (transient or persistent error), `SKIP` (concurrent run ignored).
 
-## Sécurité
+## Security
 
-- **Le token = un mot de passe.** `~/.claude/.credentials.json` donne accès à votre abonnement Claude (envoi de requêtes sur votre quota — pas à votre facturation ni à vos conversations). Traitez-le comme un mot de passe : permissions `600` (le CLI les applique lui-même), jamais commité, jamais partagé, jamais transféré via un service tiers.
-- **Révocation.** En cas de doute (machine compromise, décommissionnée…), invalidez le token : déconnectez-vous sur cette machine (`claude` puis `/logout`, ou supprimez `~/.claude/.credentials.json`) et ré-authentifiez-vous où nécessaire. Les pings d'une machine au token invalide passent en `[AUTH]` dans le log.
-- **`scheduler.conf` est exécuté.** Ce fichier est sourcé par les scripts : toute ligne qu'il contient tourne avec vos droits. Relisez-le comme du code si la modification vient d'un tiers.
-- **Les logs restent locaux.** `logs/` et `*.log` sont exclus par le `.gitignore`. Avant de coller un extrait de log dans une issue publique, retirez les chemins personnels (`/home/<user>/…`).
+- **The token = a password.** `~/.claude/.credentials.json` grants access to your Claude subscription (sending requests against your quota — not your billing or your conversations). Treat it like a password: `600` permissions (the CLI sets them itself), never committed, never shared, never transferred through a third-party service.
+- **Revocation.** If in doubt (compromised or decommissioned machine…), invalidate the token: log out on that machine (`claude` then `/logout`, or delete `~/.claude/.credentials.json`) and re-authenticate where needed. Pings from a machine with an invalid token show up as `[AUTH]` in the log.
+- **`scheduler.conf` is executed.** This file is sourced by the scripts: any line it contains runs with your privileges. Review it as code if a change comes from a third party.
+- **Logs stay local.** `logs/` and `*.log` are excluded by `.gitignore`. Before pasting a log excerpt into a public issue, remove personal paths (`/home/<user>/…`).
 
-## Limites connues
+## Known limitations
 
-- **Machine éteinte à l'heure du ping** : cron ne rattrape pas les exécutions manquées. C'est un choix délibéré : un ping de rattrapage au démarrage ouvrirait une fenêtre à une heure arbitraire — exactement l'imprévisibilité que cet outil cherche à éliminer. Mieux vaut un ancrage manqué qu'un ancrage désaligné.
-- **Ping dans une fenêtre déjà ouverte** (heures espacées de < 5 h, ou si vous avez déjà écrit à Claude avant) : sans danger et quasi gratuit, mais il n'ancre rien — la fenêtre en cours continue.
-- **Expiration du token** (~1 an) : les pings passent en `[AUTH]` dans le log ; relancer `claude setup-token`.
-- **Changement d'heure (DST)** : cron gère brutalement les nuits de changement (une heure planifiée entre 02:00 et 03:00 peut sauter ou doubler). Les horaires par défaut ne sont pas concernés.
-- **Limites hebdomadaires** : sur les abonnements qui en ont, ce mécanisme n'ancre que les fenêtres de 5 h ; il ne change rien aux plafonds hebdomadaires (le coût des pings y est négligeable).
+- **Machine off at ping time**: cron does not catch up on missed runs. This is deliberate: a catch-up ping at boot would open a window at an arbitrary time — exactly the unpredictability this tool exists to eliminate. Better a missed anchor than a misaligned one.
+- **Ping inside an already-open window** (times spaced < 5h apart, or if you already wrote to Claude before): harmless and nearly free, but it anchors nothing — the current window continues.
+- **Token expiry** (~1 year): pings switch to `[AUTH]` in the log; re-run `claude setup-token`.
+- **Daylight saving time**: cron handles switch nights crudely (a time scheduled between 02:00 and 03:00 can skip or run twice). The default times are unaffected.
+- **Weekly limits**: on subscriptions that have them, this mechanism only anchors the 5-hour windows; it does not change weekly caps (the pings' cost against them is negligible).
 
-## Test local sur macOS
+## Local testing on macOS
 
-Les scripts fonctionnent aussi sur macOS (verrou par `mkdir` atomique à défaut de `flock`, `timeout` optionnel). Pour essayer sans polluer votre crontab : `./ping.sh --dry-run`, puis `./apply-schedule.sh` suivi de `./apply-schedule.sh --remove`.
+The scripts also work on macOS (atomic-`mkdir` lock in place of `flock`, optional `timeout`). To try without polluting your crontab: `./ping.sh --dry-run`, then `./apply-schedule.sh` followed by `./apply-schedule.sh --remove`.
 
-Limite macOS : un ping lancé **par cron** y échoue en `[AUTH]`, car les identifiants claude sont stockés dans le Trousseau, inaccessible aux sessions cron (en lancement manuel, `./ping.sh` fonctionne). macOS ne sert donc qu'aux tests — le déploiement se fait sur Linux, où les identifiants sont dans `~/.claude/.credentials.json`.
+macOS limitation: a ping launched **by cron** fails there with `[AUTH]`, because claude credentials are stored in the Keychain, which cron sessions cannot access (manual `./ping.sh` runs work fine). macOS is therefore only for testing — deploy on Linux, where credentials live in `~/.claude/.credentials.json`.
