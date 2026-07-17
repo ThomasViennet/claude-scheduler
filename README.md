@@ -54,7 +54,7 @@ Aucune dépendance en dehors de bash, cron et du CLI claude.
 
    Le CLI affiche une URL OAuth : ouvrez-la dans le navigateur d'un autre appareil (Mac, téléphone), connectez-vous avec votre compte claude.ai, puis collez le code retourné dans le terminal SSH. Le token longue durée est stocké dans `~/.claude/.credentials.json`.
 
-   > Note : copier `~/.claude/.credentials.json` depuis une autre machine **Linux** fonctionne aussi, mais pas depuis macOS (où les identifiants sont dans le Trousseau, pas dans un fichier).
+   > Note : copier `~/.claude/.credentials.json` depuis une autre machine **Linux** fonctionne aussi — mais uniquement par `scp` direct entre les deux machines (jamais via un cloud, un mail ou un chat), suivi d'un `chmod 600` sur la copie. Ça ne marche pas depuis macOS (identifiants dans le Trousseau, pas dans un fichier). La méthode propre reste `claude setup-token` sur chaque machine.
 
 4. **Cloner, configurer, tester** :
 
@@ -84,7 +84,7 @@ Aucune dépendance en dehors de bash, cron et du CLI claude.
 | `PING_TIMEOUT` | `120` | Délai max d'un appel en secondes (si `timeout` est disponible). |
 | `RETRY_DELAY` | `30` | Attente avant l'unique nouvelle tentative. |
 | `CLAUDE_BIN` | `~/.local/bin/claude` | Chemin du binaire claude. |
-| `LOG_FILE` | *(vide)* | Fichier de log ; vide = `logs/ping.log` dans le dépôt. |
+| `LOG_FILE` | *(vide)* | Fichier de log ; vide = `logs/ping.log` dans le dépôt. Si vous le placez ailleurs dans le dépôt, gardez l'extension `.log` (couverte par le `.gitignore`) pour ne jamais committer vos logs. |
 | `MAX_LOG_LINES` | `2000` | Au-delà, le log est tronqué aux 1000 dernières lignes. |
 
 Après modification de `PING_TIMES`, relancer `./apply-schedule.sh` pour régénérer le crontab.
@@ -108,6 +108,13 @@ Format du log — une ligne par événement :
 ```
 
 Statuts possibles : `OK`, `DRY-RUN`, `QUOTA` (limite déjà atteinte — sans gravité, une fenêtre est déjà ouverte), `AUTH` (token expiré → relancer `claude setup-token`), `RETRY`/`ERROR` (erreur transitoire ou persistante), `SKIP` (exécution concurrente ignorée).
+
+## Sécurité
+
+- **Le token = un mot de passe.** `~/.claude/.credentials.json` donne accès à votre abonnement Claude (envoi de requêtes sur votre quota — pas à votre facturation ni à vos conversations). Traitez-le comme un mot de passe : permissions `600` (le CLI les applique lui-même), jamais commité, jamais partagé, jamais transféré via un service tiers.
+- **Révocation.** En cas de doute (machine compromise, décommissionnée…), invalidez le token : déconnectez-vous sur cette machine (`claude` puis `/logout`, ou supprimez `~/.claude/.credentials.json`) et ré-authentifiez-vous où nécessaire. Les pings d'une machine au token invalide passent en `[AUTH]` dans le log.
+- **`scheduler.conf` est exécuté.** Ce fichier est sourcé par les scripts : toute ligne qu'il contient tourne avec vos droits. Relisez-le comme du code si la modification vient d'un tiers.
+- **Les logs restent locaux.** `logs/` et `*.log` sont exclus par le `.gitignore`. Avant de coller un extrait de log dans une issue publique, retirez les chemins personnels (`/home/<user>/…`).
 
 ## Limites connues
 

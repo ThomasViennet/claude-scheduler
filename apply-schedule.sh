@@ -61,10 +61,12 @@ done
 if [ ! -x "$CLAUDE_BIN" ]; then
   echo "Attention : CLAUDE_BIN ($CLAUDE_BIN) introuvable — installez le CLI avant le premier ping." >&2
 fi
+# % est spécial pour Vixie cron (fin de commande) même quoté ; les autres
+# casseraient les doubles quotes de la ligne cron interprétée par sh.
 case "$SCRIPT_DIR" in
-  *%*|*$'\n'*)
-    # % est un caractère spécial de Vixie cron (fin de commande), même quoté.
-    echo "Le chemin du dépôt contient un caractère incompatible avec cron (% ou saut de ligne) : $SCRIPT_DIR" >&2
+  *%*|*'"'*|*'$'*|*'`'*|*';'*|*'\'*|*$'\n'*)
+    echo "Le chemin du dépôt contient un caractère incompatible avec cron ou sa ligne de commande (% \" \$ \` ; \\ ou saut de ligne) : $SCRIPT_DIR" >&2
+    echo "Déplacez le dépôt vers un chemin sans caractère spécial." >&2
     exit 1
     ;;
 esac

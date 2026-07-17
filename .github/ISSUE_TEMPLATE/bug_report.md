@@ -12,8 +12,8 @@ A clear and concise description of what the bug is.
 
 ## Steps to reproduce
 
-1. Go to '...'
-2. Click on '...'
+1. Configuration used (`scheduler.conf` values, redacted if needed)
+2. Command run (`./ping.sh`, `./apply-schedule.sh`, cron trigger…)
 3. See error
 
 ## Expected behavior
@@ -26,10 +26,12 @@ What actually happened.
 
 ## Environment
 
-- OS:
-- Browser / version:
-- Version of claude-scheduler:
+- OS / distribution (e.g. Raspberry Pi OS Bookworm 64-bit, Debian 12, Ubuntu 24.04):
+- Hardware (e.g. Raspberry Pi 3, VPS):
+- Claude Code CLI version (`claude --version`):
+- Version of claude-scheduler (commit or tag):
 
 ## Additional context
 
-Add any other context, logs, or screenshots about the problem here.
+Relevant lines from `logs/ping.log` help a lot.
+**Before pasting logs, remove personal paths (`/home/<user>/…`) and any other detail you consider private.** Never paste the content of `~/.claude/.credentials.json`.

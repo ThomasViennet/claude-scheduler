@@ -28,9 +28,10 @@ log() {
   printf '%s [%s] %s\n' "$(date +%Y-%m-%dT%H:%M:%S%z)" "$1" "$2" >> "$LOG_FILE"
 }
 
-# Aplatit une sortie multi-ligne et la tronque pour tenir sur une ligne de log.
+# Aplatit une sortie multi-ligne, retire les caractères de contrôle (séquences
+# ANSI comprises — le log est relu au terminal via tail/cat) et tronque.
 flat() {
-  printf '%s' "$1" | tr '\n' ' ' | cut -c1-"$2"
+  printf '%s' "$1" | tr '\n' ' ' | tr -d '\000-\010\013-\037\177' | cut -c1-"$2"
 }
 
 # --- Verrou anti-concurrence -------------------------------------------------
